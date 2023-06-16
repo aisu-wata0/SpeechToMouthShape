@@ -46,8 +46,16 @@ def load_pickle(filepath):
     return obj
 
 sample_length = 256
-model_best_filepath = str(Path(__file__).parent / "models/speech_to_mouth-best.pkl")
 model_trained_filepath = str(Path(__file__).parent / "models/speech_to_mouth")
+
+model_best_filepath = str(Path(__file__).parent / "models/best/speech_to_mouth-best.pkl")
+
+model_name = "speech_to_mouth DecisionTreeClassifier 256 X,X^2 targets_class 2023-06-16T01_17_37  0.0004399347193642233.pkl"
+model_name = "speech_to_mouth DecisionTreeClassifier 512 X,X^2 targets_class 2023-06-16T02_19_21  0.0006821836993652452.pkl"
+model_name = "speech_to_mouth DecisionTreeClassifier 768 X,X^2 targets_class 2023-06-16T02_37_14  0.0004910988336402701.pkl"
+model_name = "speech_to_mouth DecisionTreeClassifier 512 X,X^2 targets_class 2023-06-16T02_19_21  0.0010891561507708.pkl"
+
+model_best_filepath = str(Path(__file__).parent / f"models/best/{model_name}")
 model = None
 try:
     if model_best_filepath:
@@ -63,6 +71,15 @@ mouth_to_class = {
     'o': 4 + 1,
 }
 mouth_to_class[''] = 0
+class_color_map = {0: 'gray', 1: 'red', 2: 'blue', 3: 'green', 4: 'yellow', 5: 'black'}
+mouth_color_map = {
+    None: 'gray',
+    'a': 'red',
+    'i': 'blue',
+    'u': 'green',
+    'e': 'yellow',
+    'o': 'black',
+}
 
 class_to_mouth = {
     c: mouth
@@ -150,11 +167,10 @@ def test_sample(
     volumes = [r['volume_mean'] for r in parameter_blocks]
     seconds = [seconds_per_frame*i for i in range(len(volumes))]
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(15,15))
 
     # Map mouth shapes to colors
-    color_map = {0: 'gray', 1: 'red', 2: 'blue', 3: 'green', 4: 'yellow', 5: 'black'}
-    colors = [color_map[shape] for shape in mouths]
+    colors = [class_color_map[shape] for shape in mouths]
     # Plot mouth shapes
     ax.scatter(seconds, volumes, c=colors)
     ax.legend(mouth_to_class.keys())
@@ -375,8 +391,9 @@ def getVariables(parameter_blocks):
 
 
 
-def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tts_clipboard_server/soundfiles/dataset"):
+def train(sample_length=sample_length, plot_results=False, plot_savefig=True, dataset_folder_filepath = "S:/AI/Voice/tts_clipboard_server/soundfiles/dataset"):
     import matplotlib.pyplot as plt
+    timestamp = datetime.datetime.now().isoformat(timespec='seconds').replace(':', '_')
         
     def getXs(variables):
         Xs = {
@@ -571,11 +588,6 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
                     time.sleep(0.001)
                     path = clf.cost_complexity_pruning_path(X_train, y_train)
                     ccp_alphas, impurities = path.ccp_alphas, path.impurities
-                    fig, ax = plt.subplots()
-                    ax.plot(ccp_alphas[:-1], impurities[:-1], marker="o", drawstyle="steps-post")
-                    ax.set_xlabel("effective alpha")
-                    ax.set_ylabel("total impurity of leaves")
-                    ax.set_title("Total Impurity vs effective alpha for training set")
 
                     print("Making clfs", flush=True)
                     print(len(ccp_alphas), flush=True)
@@ -607,25 +619,30 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
                     time.sleep(0.001)
                     node_counts = [clf.tree_.node_count for clf in clfs]
                     depth = [clf.tree_.max_depth for clf in clfs]
-                    fig, ax = plt.subplots(2, 1)
-                    ax[0].plot(ccp_alphas, node_counts, marker="o", drawstyle="steps-post")
-                    ax[0].set_xlabel("alpha")
-                    ax[0].set_ylabel("number of nodes")
-                    ax[0].set_title("Number of nodes vs alpha")
-                    ax[1].plot(ccp_alphas, depth, marker="o", drawstyle="steps-post")
-                    ax[1].set_xlabel("alpha")
-                    ax[1].set_ylabel("depth of tree")
-                    ax[1].set_title("Depth vs alpha")
-                    fig.tight_layout()
+                    
+                    if plot_results:
+                        fig, ax = plt.subplots(2, 1,figsize=(15,15))
+                        ax[0].plot(ccp_alphas, node_counts, marker="o", drawstyle="steps-post")
+                        ax[0].set_xlabel("alpha")
+                        ax[0].set_ylabel("number of nodes")
+                        ax[0].set_title("Number of nodes vs alpha")
+                        ax[1].plot(ccp_alphas, depth, marker="o", drawstyle="steps-post")
+                        ax[1].set_xlabel("alpha")
+                        ax[1].set_ylabel("depth of tree")
+                        ax[1].set_title("Depth vs alpha")
+                        fig.tight_layout()
+                        if plot_savefig:
+                            fig.savefig(str(Path(__file__).parent / f"plots/0 {sample_length} {timestamp}.pdf"), dpi=800)
                     print("node_counts", node_counts, flush=True)
                     print("depth", depth, flush=True)
 
                     print("Metrics vs alpha for training and testing sets")
                     time.sleep(0.001)
-                    fig, ax = plt.subplots()
-                    ax.set_xlabel("alpha")
-                    ax.set_ylabel("metrics")
-                    ax.set_title("Metrics vs alpha for training and testing sets")
+                    if plot_results:
+                        fig, ax = plt.subplots(figsize=(15,15))
+                        ax.set_xlabel("alpha")
+                        ax.set_ylabel("metrics")
+                        ax.set_title("Metrics vs alpha for training and testing sets")
 
                     # ax.plot(ccp_alphas, [clf.score(X_train, y_train) for clf in clfs], marker="o", label="score train", drawstyle="steps-post")
                     # ax.plot(ccp_alphas, [clf.score(X_test, y_test) for clf in clfs], marker="o", label="score test", drawstyle="steps-post")
@@ -635,72 +652,91 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
                     y_pred_tests = [clf.predict(X_test) for clf in clfs]
                     m = {}
                     argsorts = {}
-                    ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="precision train macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="precision train macro", drawstyle="steps-post")
                     m['precision test macro'] = [metrics.precision_score(y_test, y_pred_test, average='macro') for y_pred_test in y_pred_tests]
                     argsorts['precision test macro'] = np.argsort(m['precision test macro'])[::-1]
                     print(m['precision test macro'])
                     print("argsorts['precision test macro']", argsorts['precision test macro'])
                     print("Best", np.argmax(m['precision test macro']), ccp_alphas[np.argmax(m['precision test macro'])], "precision test macro")
-                    ax.plot(ccp_alphas, m['precision test macro'], marker="x", label="precision test macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['precision test macro'], marker="x", label="precision test macro", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="precision train micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="precision train micro", drawstyle="steps-post")
                     m['precision test micro'] = [metrics.precision_score(y_test, y_pred_test, average='micro') for y_pred_test in y_pred_tests]
                     argsorts['precision test micro'] = np.argsort(m['precision test micro'])[::-1]
                     print(m['precision test micro'])
                     print("argsorts['precision test micro']", argsorts['precision test micro'])
                     print("Best", np.argmax(m['precision test micro']), ccp_alphas[np.argmax(m['precision test micro'])], "precision test micro")
-                    ax.plot(ccp_alphas, m['precision test micro'], marker="x", label="precision test micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['precision test micro'], marker="x", label="precision test micro", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='weighted') for y_pred_train in y_pred_trains], marker="o", label="precision train weighted", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.precision_score(y_train, y_pred_train, average='weighted') for y_pred_train in y_pred_trains], marker="o", label="precision train weighted", drawstyle="steps-post")
                     m['precision test weighted'] = [metrics.precision_score(y_test, y_pred_test, average='weighted') for y_pred_test in y_pred_tests]
                     argsorts['precision test weighted'] = np.argsort(m['precision test weighted'])[::-1]
                     print(m['precision test weighted'])
                     print("argsorts['precision test weighted']", argsorts['precision test weighted'])
                     print("Best", np.argmax(m['precision test weighted']), ccp_alphas[np.argmax(m['precision test weighted'])], "precision test weighted")
-                    ax.plot(ccp_alphas, m['precision test weighted'], marker="x", label="precision test weighted", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['precision test weighted'], marker="x", label="precision test weighted", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="recall train macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="recall train macro", drawstyle="steps-post")
                     m['recall test macro'] = [metrics.recall_score(y_test, y_pred_test, average='macro') for y_pred_test in y_pred_tests]
                     argsorts['recall test macro'] = np.argsort(m['recall test macro'])[::-1]
                     print(m['recall test macro'])
                     print("argsorts['recall test macro']", argsorts['recall test macro'])
                     print("Best", np.argmax(m['recall test macro']), ccp_alphas[np.argmax(m['recall test macro'])], "recall test macro")
-                    ax.plot(ccp_alphas, m['recall test macro'], marker="x", label="recall test macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['recall test macro'], marker="x", label="recall test macro", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="recall train micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="recall train micro", drawstyle="steps-post")
                     m['recall test micro'] = [metrics.recall_score(y_test, y_pred_test, average='micro') for y_pred_test in y_pred_tests]
                     argsorts['recall test micro'] = np.argsort(m['recall test micro'])[::-1]
                     print(m['recall test micro'])
                     print("argsorts['recall test micro']", argsorts['recall test micro'])
                     print("Best", np.argmax(m['recall test micro']), ccp_alphas[np.argmax(m['recall test micro'])], "recall test micro")
-                    ax.plot(ccp_alphas, m['recall test micro'], marker="x", label="recall test micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['recall test micro'], marker="x", label="recall test micro", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='weighted') for y_pred_train in y_pred_trains], marker="o", label="recall train weighted", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.recall_score(y_train, y_pred_train, average='weighted') for y_pred_train in y_pred_trains], marker="o", label="recall train weighted", drawstyle="steps-post")
                     m['recall test weighted'] = [metrics.recall_score(y_test, y_pred_test, average='weighted') for y_pred_test in y_pred_tests]
                     argsorts['recall test weighted'] = np.argsort(m['recall test weighted'])[::-1]
                     print(m['recall test weighted'])
                     print("argsorts['recall test weighted']", argsorts['recall test weighted'])
                     print("Best", np.argmax(m['recall test weighted']), ccp_alphas[np.argmax(m['recall test weighted'])], "recall test weighted")
-                    ax.plot(ccp_alphas, m['recall test weighted'], marker="x", label="recall test weighted", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['recall test weighted'], marker="x", label="recall test weighted", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.f1_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="f1 train macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.f1_score(y_train, y_pred_train, average='macro') for y_pred_train in y_pred_trains], marker="o", label="f1 train macro", drawstyle="steps-post")
                     m['f1 test macro'] = [metrics.f1_score(y_test, y_pred_test, average='macro') for y_pred_test in y_pred_tests]
                     argsorts['f1 test macro'] = np.argsort(m['f1 test macro'])[::-1]
                     print(m['f1 test macro'])
                     print("argsorts['f1 test macro']", argsorts['f1 test macro'])
                     print("Best", np.argmax(m['f1 test macro']), ccp_alphas[np.argmax(m['f1 test macro'])], "f1 test macro")
-                    ax.plot(ccp_alphas, m['f1 test macro'], marker="x", label="f1 test macro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['f1 test macro'], marker="x", label="f1 test macro", drawstyle="steps-post")
 
-                    ax.plot(ccp_alphas, [metrics.f1_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="f1 train micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, [metrics.f1_score(y_train, y_pred_train, average='micro') for y_pred_train in y_pred_trains], marker="o", label="f1 train micro", drawstyle="steps-post")
                     m['f1 test micro'] = [metrics.f1_score(y_test, y_pred_test, average='micro') for y_pred_test in y_pred_tests]
                     argsorts['f1 test micro'] = np.argsort(m['f1 test micro'])[::-1]
                     print(m['f1 test micro'])
                     print("argsorts['f1 test micro']", argsorts['f1 test micro'])
                     print("Best", np.argmax(m['f1 test micro']), ccp_alphas[np.argmax(m['f1 test micro'])], "f1 test micro")
-                    ax.plot(ccp_alphas, m['f1 test micro'], marker="x", label="f1 test micro", drawstyle="steps-post")
+                    if plot_results:
+                        ax.plot(ccp_alphas, m['f1 test micro'], marker="x", label="f1 test micro", drawstyle="steps-post")
 
-                    ax.legend()
-                    fig.tight_layout()
+                    if plot_results:
+                        ax.legend()
+                        fig.tight_layout()
+                        if plot_savefig:
+                            fig.savefig(str(Path(__file__).parent / f"plots/1 {sample_length} {timestamp}.pdf"), dpi=800)
 
                     # Cross-validate best ones
                     metric_names = [
@@ -719,7 +755,7 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
                     idx_cross = argsorts['f1 test macro']
                     ccp_alphas_cross = [ccp_alphas[idx] for idx in idx_cross]
                     # Sort ccp_alphas_cross and f1_scores arrays based on ccp_alphas_cross
-                    sort_idx = np.argsort(ccp_alphas_cross)
+                    sorted_ccp_alphas_idxs = np.argsort(ccp_alphas_cross)
 
                     for idx in idx_cross:
                         ccp_alpha = ccp_alphas[idx]
@@ -742,48 +778,55 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
 
 
                     metric_get_best = 'f1_macro'
-                    best_idx = np.argmax(metrics_cross[metric_get_best])
+                    best_idx_sort = np.argsort(metrics_cross[metric_get_best])[::-1]
+
+                    best_idx = best_idx_sort[0]
                     best_ccp_alpha = ccp_alphas_cross[best_idx]
-                    # 0.00044728313727107486
-                    
                     print(f'best {metric_get_best} {metrics_cross[metric_get_best][best_idx]}')
                     print(f'best_ccp_alpha {best_ccp_alpha}')
-                    models[target_type][sound][input_name]["DecisionTreeClassifier_best"] = tree.DecisionTreeClassifier(random_state=0, ccp_alpha=best_ccp_alpha).fit(X, y)
+                    # 0.00044728313727107486
 
-                    models[target_type][sound][input_name]["DecisionTreeClassifier_best"].info = {
-                        'sample_length': sample_length,
-                        'input_name': input_name,
-                        'target_type': target_type,
-                        'params_normalization': params_normalization,
-                    }
-                    timestamp = datetime.datetime.now().isoformat(timespec='seconds').replace(':', '_')
-                    name = models[target_type][sound][input_name]["DecisionTreeClassifier_best"].__class__.__name__
-                    fname = f"{name} {sample_length} {input_name} {target_type} {timestamp}"
-                    save_pickle(
-                        models[target_type][sound][input_name]["DecisionTreeClassifier_best"],
-                        model_trained_filepath + f" {fname}.pkl"
-                    )
-                    dot_data = tree.export_graphviz(models[target_type][sound][input_name]["DecisionTreeClassifier_best"], out_file=model_trained_filepath + f" {fname}.dot")
+                    for best_idx in best_idx_sort[:30]:
+                        best_ccp_alpha = ccp_alphas_cross[best_idx]
+                        
+                        models[target_type][sound][input_name]["DecisionTreeClassifier_best"] = tree.DecisionTreeClassifier(random_state=0, ccp_alpha=best_ccp_alpha).fit(X, y)
 
-                    fig, ax = plt.subplots()
-                    ax.set_xlabel("alpha")
-                    ax.set_ylabel("metrics")
-                    ax.set_title("Metrics vs alpha (Cross-validation mean)")
-                    for metric_name, values in metrics_cross.items():
-                        if metric_name.endswith("_std"):
-                            values_t = metrics_cross[metric_name[:-len("_std")]]
-                            values_t_sorted = [values_t[idx] for idx in sort_idx]
-                            ax.fill_between(
-                                [ccp_alphas_cross[idx] for idx in sort_idx],
-                                [values_t_sorted[idx] - values[idx] for idx in sort_idx],
-                                [values_t_sorted[idx] + values[idx] for idx in sort_idx],
-                                alpha=0.2,
-                            )
-                            continue
-                        ax.plot([ccp_alphas_cross[idx] for idx in sort_idx], [values[idx] for idx in sort_idx], marker="x", label=metric_name, drawstyle="steps-post")
+                        models[target_type][sound][input_name]["DecisionTreeClassifier_best"].info = {
+                            'sample_length': sample_length,
+                            'input_name': input_name,
+                            'target_type': target_type,
+                            'params_normalization': params_normalization,
+                        }
+                        name = models[target_type][sound][input_name]["DecisionTreeClassifier_best"].__class__.__name__
+                        fname = f"{name} {sample_length} {input_name} {target_type} {timestamp}  {best_ccp_alpha}"
+                        save_pickle(
+                            models[target_type][sound][input_name]["DecisionTreeClassifier_best"],
+                            model_trained_filepath + f" {fname}.pkl"
+                        )
+                        dot_data = tree.export_graphviz(models[target_type][sound][input_name]["DecisionTreeClassifier_best"], out_file=model_trained_filepath + f" {fname}.dot")
 
-                    ax.legend()
-                    fig.tight_layout()
+                        if plot_results:
+                            fig, ax = plt.subplots(figsize=(15,15))
+                            ax.set_xlabel("alpha")
+                            ax.set_ylabel("metrics")
+                            ax.set_title("Metrics vs alpha (Cross-validation mean)")
+                            for metric_name, values in metrics_cross.items():
+                                if metric_name.endswith("_std"):
+                                    values_t = metrics_cross[metric_name[:-len("_std")]]
+                                    values_t_sorted = [values_t[idx] for idx in sorted_ccp_alphas_idxs]
+                                    ax.fill_between(
+                                        [ccp_alphas_cross[idx] for idx in sorted_ccp_alphas_idxs],
+                                        [values_t_sorted[idx] - values[idx] for idx in sorted_ccp_alphas_idxs],
+                                        [values_t_sorted[idx] + values[idx] for idx in sorted_ccp_alphas_idxs],
+                                        alpha=0.2,
+                                    )
+                                    continue
+                                ax.plot([ccp_alphas_cross[idx] for idx in sorted_ccp_alphas_idxs], [values[idx] for idx in sorted_ccp_alphas_idxs], marker="x", label=metric_name, drawstyle="steps-post")
+
+                            ax.legend()
+                            fig.tight_layout()
+                            if plot_savefig:
+                                fig.savefig(str(Path(__file__).parent / f"plots/2 {fname}.pdf"), dpi=800)
 
                     # accuracy = metrics.accuracy_score(y, y_pred)
                     # cm = metrics.confusion_matrix(y, y_pred)
@@ -793,7 +836,9 @@ def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tt
 
                     print(m)
                     print(flush=True)
-                    plt.show()
+                    if plot_results:
+                        if not plot_savefig:
+                            plt.show()
 
 
     # evaluations = {
@@ -1036,8 +1081,12 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Description of your program')
     parser.add_argument('-s','--sample_length', help='Length of splits of wav data', default=sample_length, type=int)
+    parser.add_argument('--plot_results', dest='plot_results', default=False, action='store_true')
+    parser.add_argument('--plot_show', dest='plot_show', default=False, action='store_true')
+    parser.add_argument('--train', dest='train models', default=False, action='store_true')
     args = parser.parse_args()
     sample_length = args.sample_length
 
-    # test_sample()
-    train(sample_length)
+    test_sample()
+    if args.train:
+        train(sample_length, plot_results=args.plot_results, plot_savefig=not args.plot_show)
