@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Set
 from abc import ABC, abstractmethod
 
 import time
+import datetime
 import pickle
 from pathlib import Path
 
@@ -45,11 +46,12 @@ def load_pickle(filepath):
     return obj
 
 sample_length = 256
-trained_model_filepath = "DecisionTreeClassifier_best.pkl"
+model_best_filepath = str(Path(__file__).parent / "models/speech_to_mouth-best.pkl")
+model_trained_filepath = str(Path(__file__).parent / "models/speech_to_mouth")
 model = None
 try:
-    if trained_model_filepath:
-        model = load_pickle(trained_model_filepath)
+    if model_best_filepath:
+        model = load_pickle(model_best_filepath)
 except Exception as e:
     print(e)
 
@@ -60,7 +62,13 @@ mouth_to_class = {
     'e': 3 + 1,
     'o': 4 + 1,
 }
-# with 0 being no mouth shape
+mouth_to_class[''] = 0
+
+class_to_mouth = {
+    c: mouth
+    for c, mouth in mouth_to_class.items()
+}
+class_to_mouth[0] = ''
 
 params_normalization = {'mean': {'max': 711112.5, 'min': 999.8803905294758}, 'sd': {'max': 8014158.254359923, 'min': 1286.599240389892}, 'median': {'max': 8354.8828125, 'min': 86.1328125}, 'mode': {'max': 11025.0, 'min': 0.0}, 'Q25': {'max': 6201.5625, 'min': 86.1328125}, 'Q75': {'max': 9991.40625, 'min': 86.1328125}, 'IQR': {'max': 8527.1484375, 'min': 0.0}, 'skew': {'max': 11.0249560469972, 'min': -0.7907742995538356}, 'kurt': {'max': 123.62955768287958, 'min': 0.0}, 'volume_max': {'max': 32767.0, 'min': 0.0}, 'volume_mean': {'max': 19220.188, 'min': 0.0}, 'volume_rms': {'max': 21232.412, 'min': 0.0}, 'freq_max': {'max': 10939.53488372093, 'min': -10939.53488372093}, 'centroid': {'max': 5598.526078816624, 'min': -3297.5241893402645}, 'bandwidth': {'max': 128, 'min': -128}, 'flatness': {'max': 2.0000000000000098, 'min': 0.00015299482225978076}, 'mfcc_0': {'max': 24.233880917366466, 'min': -36.04365338911715}, 'mfcc_1': {'max': 12.554454176163494, 'min': -84.02119233057584}, 'mfcc_2': {'max': 43.675537895753074, 'min': -62.62272546468663}, 'mfcc_3': {'max': 31.907646553322977, 'min': -54.778947796150064}, 'mfcc_4': {'max': 27.373680419554596, 'min': -71.75078161538553}, 'mfcc_5': {'max': 47.012629016512435, 'min': -54.46190636182448}, 'mfcc_6': {'max': 40.16331646319932, 'min': -50.76562755300782}, 'mfcc_7': {'max': 39.48296079407826, 'min': -54.526889816674384}, 'mfcc_8': {'max': 48.395534759571994, 'min': -41.02707561753776}, 'mfcc_9': {'max': 45.00196887359644, 'min': -56.00133514021377}, 'mfcc_10': {'max': 36.10272026258943, 'min': -53.36256356875037}, 'mfcc_11': {'max': 42.23755345027889, 'min': -32.75776462684947}, 'mfcc_12': {'max': 33.15121707347, 'min': -39.15355424906901}, 'logfbank_0': {'max': 15.105728522405887, 'min': -36.04365338911715}, 'logfbank_1': {'max': 15.614791371503687, 'min': -36.04365338911715}, 'logfbank_2': {'max': 18.734701529861006, 'min': -36.04365338911715}, 'logfbank_3': {'max': 19.153880165152078, 'min': -36.04365338911715}, 'logfbank_4': {'max': 19.203046091078264, 'min': -36.04365338911715}, 'logfbank_5': {'max': 20.371671572643574, 'min': -36.04365338911715}, 'logfbank_6': {'max': 20.97016034987541, 'min': -36.04365338911715}, 'logfbank_7': {'max': 21.334005809979175, 'min': -36.04365338911715}, 'logfbank_8': {'max': 21.33885317243855, 'min': -36.04365338911715}, 'logfbank_9': {'max': 21.80236851361376, 'min': -36.04365338911715}, 'logfbank_10': {'max': 22.570830616683985, 'min': -36.04365338911715}, 'logfbank_11': {'max': 23.06864867753392, 'min': -36.04365338911715}, 'logfbank_12': {'max': 21.85895772402514, 'min': -36.04365338911715}, 'logfbank_13': {'max': 21.05722179995083, 'min': -36.04365338911715}, 'logfbank_14': {'max': 22.30122165862296, 'min': -36.04365338911715}, 'logfbank_15': {'max': 22.66529663278015, 'min': -36.04365338911715}, 'logfbank_16': {'max': 22.68310306828238, 'min': -36.04365338911715}, 'logfbank_17': {'max': 23.446048577694928, 'min': -36.04365338911715}, 'logfbank_18': {'max': 23.415488327019535, 'min': -36.04365338911715}, 'logfbank_19': {'max': 22.051496058747805, 'min': -36.04365338911715}, 'logfbank_20': {'max': 22.029513841334353, 'min': -36.04365338911715}, 'logfbank_21': {'max': 21.371627499240898, 'min': -36.04365338911715}, 'logfbank_22': {'max': 21.24705676224204, 'min': -36.04365338911715}, 'logfbank_23': {'max': 21.491085171725285, 'min': -36.04365338911715}, 'logfbank_24': {'max': 21.22217939862436, 'min': -36.04365338911715}, 'logfbank_25': {'max': 20.442105584304212, 'min': -36.04365338911715}, 'ssc_0': {'max': 87.1248285412828, 'min': 44.078062517434276}, 'ssc_1': {'max': 172.98198230500205, 'min': 90.95090830721895}, 'ssc_2': {'max': 298.9609973235045, 'min': 187.59295156440774}, 'ssc_3': {'max': 425.0947936885053, 'min': 268.84035247272163}, 'ssc_4': {'max': 552.430267344236, 'min': 400.2107386101908}, 'ssc_5': {'max': 683.6998328519743, 'min': 529.2072544241851}, 'ssc_6': {'max': 845.4410684369715, 'min': 656.6086527412391}, 'ssc_7': {'max': 1021.1707848426114, 'min': 796.389054566228}, 'ssc_8': {'max': 1190.798648902234, 'min': 971.9530814103304}, 'ssc_9': {'max': 1430.5334059646425, 'min': 1144.949410260746}, 'ssc_10': {'max': 1647.3852460608375, 'min': 1323.2191347299172}, 'ssc_11': {'max': 1900.3619640368936, 'min': 1587.7874403852602}, 'ssc_12': {'max': 2190.789735469687, 'min': 1787.7007042495247}, 'ssc_13': {'max': 2529.829945330722, 'min': 2076.203641711571}, 'ssc_14': {'max': 2890.5162162113425, 'min': 2407.0825254871343}, 'ssc_15': {'max': 3291.4620746264363, 'min': 2761.3931255496555}, 'ssc_16': {'max': 3721.772503858728, 'min': 3197.6062753044826}, 'ssc_17': {'max': 4241.159951637019, 'min': 3614.1449756910315}, 'ssc_18': {'max': 4714.419314728603, 'min': 4135.262136494613}, 'ssc_19': {'max': 5306.347423515851, 'min': 4532.7535513454695}, 'ssc_20': {'max': 5874.757870818822, 'min': 5135.324179182116}, 'ssc_21': {'max': 6602.474263520454, 'min': 5713.952092509708}, 'ssc_22': {'max': 7572.335075148525, 'min': 6592.198348579372}, 'ssc_23': {'max': 8476.800570590758, 'min': 7400.135238134993}, 'ssc_24': {'max': 9421.829037585461, 'min': 8297.637610069454}, 'ssc_25': {'max': 10334.957173988427, 'min': 9226.172624280156}}
 
@@ -95,6 +103,38 @@ def getWavData(filename):
             'seconds': seconds,
         }
 
+
+def mouthClassesToKeyframes(mouth_sequence, seconds_per_frame, class_to_mouth=class_to_mouth):
+    """
+    mouth_sequence: numpy array with integer classes that map to mouth shapes
+    `class_to_mouth[class_integer] = "string_representing_mouth_shape"`
+
+    return ordered keyframes in the format:
+    keyframes = {
+        second_in_which_mouth_changed_from_last: new_mouth_shape
+        for every mouth changed from one frame to the next
+    }
+    """
+    keyframes = {}
+    previous_mouth_class = None
+
+    for frame_num, mouth_class in enumerate(mouth_sequence):
+        if mouth_class != previous_mouth_class:
+            # Mouth shape changed, add a keyframe
+            seconds = frame_num * seconds_per_frame
+            keyframes[seconds] = class_to_mouth[mouth_class]
+            previous_mouth_class = mouth_class
+    return keyframes
+
+def filepathToKeyframes(filepath):
+    wav = getWavData(str(filepath))
+    # end = time.perf_counter()
+    # logTime("getWavData", end - start)
+    # start = time.perf_counter()
+    mouths, parameter_blocks = getMouthShapeFromWavData(wav)
+    seconds_per_frame = getWavSecondsDurationFromSliceLength(wav, model.info['sample_length'])
+    return mouthClassesToKeyframes(mouths, seconds_per_frame)
+
 def test_sample(
     filename = "speech.wav", model=model
 ):
@@ -104,10 +144,10 @@ def test_sample(
     # logTime("getWavData", end - start)
     # start = time.perf_counter()
     mouths, parameter_blocks = getMouthShapeFromWavData(wav)
+    seconds_per_frame = getWavSecondsDurationFromSliceLength(wav, model.info['sample_length'])
     # end = time.perf_counter()
     # logTime("getMouthShapeFromWavData", end - start)
     volumes = [r['volume_mean'] for r in parameter_blocks]
-    seconds_per_frame = getWavSecondsDurationFromSliceLength(wav, model.info['sample_length'])
     seconds = [seconds_per_frame*i for i in range(len(volumes))]
 
     fig, ax = plt.subplots()
@@ -181,7 +221,7 @@ def spectral_properties(y: np.ndarray, fs: int) -> dict:
 
     return result_d
 
-def parameters_from_slice(wav_data, sample_rate, winlen):
+def parameters_from_slice(wav_data, sample_rate, winlen, sample_length=sample_length):
     # wav_data is a very short sound sample.
     parameters = {}
     wav_data = wav_data.astype(np.float32)
@@ -230,17 +270,17 @@ def parameters_from_slice(wav_data, sample_rate, winlen):
     # MFCCs
     numcep = 13
     
-    mfcc = sf.mfcc(wav_data, sample_rate, winlen=winlen, winstep=winlen, numcep=numcep)
+    mfcc = sf.mfcc(wav_data, sample_rate, numcep=numcep, winlen=winlen, winstep=winlen, nfft=sample_length,)
     # end = time.perf_counter()
     # logTime("parameters_from_slice.mfcc", end - start)
 
     # start = time.perf_counter()
-    logfbank = sf.logfbank(wav_data, sample_rate, winlen=winlen, winstep=winlen,)
+    logfbank = sf.logfbank(wav_data, sample_rate, winlen=winlen, winstep=winlen, nfft=sample_length,)
     # end = time.perf_counter()
     # logTime("parameters_from_slice.logfbank", end - start)
 
     # start = time.perf_counter()
-    ssc = sf.base.ssc(wav_data, sample_rate, winlen=winlen, winstep=winlen,)
+    ssc = sf.base.ssc(wav_data, sample_rate, winlen=winlen, winstep=winlen, nfft=sample_length,)
     # end = time.perf_counter()
     # logTime("parameters_from_slice.ssc", end - start)
 
@@ -267,7 +307,7 @@ def getParams(wav, sample_length=sample_length):
         # Get slice of wav data
         slice_data = wav['data'][i:i+sample_length]
         sample_seconds = getWavSecondsDurationFromSliceLength(wav, sample_length)
-        params = parameters_from_slice(slice_data, wav['sample_rate'], sample_seconds)
+        params = parameters_from_slice(slice_data, wav['sample_rate'], sample_seconds, sample_length=sample_length)
         parameter_blocks.append(params)
     return parameter_blocks
 
@@ -282,7 +322,7 @@ def prepInput(parameter_blocks, input_name, params_normalization):
     for k in parameter_blocks[0].keys():
         if k in ['mouth_shapes'] or k.startswith('target'):
             continue
-        vars = np.array([b[k] for b in parameter_blocks], dtype=np.float64)
+        vars = np.array([b[k] for b in parameter_blocks], dtype=np.float32)
         v_max = params_normalization[k]['max']
         v_min = params_normalization[k]['min']
         vars = np.clip((vars - v_min) / (v_max - v_min), 0.0, 1.0)
@@ -335,7 +375,7 @@ def getVariables(parameter_blocks):
 
 
 
-def train():
+def train(sample_length=sample_length, dataset_folder_filepath = "S:/AI/Voice/tts_clipboard_server/soundfiles/dataset"):
     import matplotlib.pyplot as plt
         
     def getXs(variables):
@@ -356,7 +396,7 @@ def train():
     
     
     def getSimpleSampleParameters(wav, threshold, threshold_param_name='volume_max', sample_length=sample_length):
-        parameter_blocks = getParams(wav, sample_length)
+        parameter_blocks = getParams(wav, sample_length=sample_length)
         parameter_blocks = parameter_blocks[:-1]
 
         idx_start, idx_end = arrStarAndEnd(np.array([
@@ -370,8 +410,6 @@ def train():
                 p['target'] = 1
 
         return parameter_blocks
-
-    dataset_folder_filepath = "S:/AI/Voice/tts_clipboard_server/soundfiles/dataset"
 
     vowel_files = {'a': [], 'e': [], 'i': [], 'o': [], 'u': []}
     file_count = 0
@@ -405,7 +443,7 @@ def train():
         for filename in filenames:
             print(filename)
             wav = getWavData(str(filename))
-            parameter_blocks = getSimpleSampleParameters(wav, 200)
+            parameter_blocks = getSimpleSampleParameters(wav, 200, sample_length=sample_length)
 
             for parameter_block in parameter_blocks:
                 for param_name, param in parameter_block.items():
@@ -524,13 +562,7 @@ def train():
                     if target_type == 'target':
                         models[target_type][sound][input_name]["RidgeClassifier"] = linear_model.RidgeClassifier().fit(X, y)
                 if target_type == 'targets_class':
-                    print(f"X {X.shape}", flush=True)
-                    print(f"y {y.shape}", flush=True)
-
                     models[target_type][sound][input_name]["DecisionTreeClassifier"] = tree.DecisionTreeClassifier(random_state=0, ccp_alpha=0.0).fit(X, y)
-
-                    dot_data = tree.export_graphviz(models[target_type][sound][input_name]["DecisionTreeClassifier"], out_file="DecisionTreeClassifier.dot")
-
 
                     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, random_state=0)
 
@@ -724,8 +756,14 @@ def train():
                         'target_type': target_type,
                         'params_normalization': params_normalization,
                     }
-                    save_pickle(models[target_type][sound][input_name]["DecisionTreeClassifier_best"], trained_model_filepath)
-                    dot_data = tree.export_graphviz(models[target_type][sound][input_name]["DecisionTreeClassifier_best"], out_file="DecisionTreeClassifier_best.dot")
+                    timestamp = datetime.datetime.now().isoformat(timespec='seconds').replace(':', '_')
+                    name = models[target_type][sound][input_name]["DecisionTreeClassifier_best"].__class__.__name__
+                    fname = f"{name} {sample_length} {input_name} {target_type} {timestamp}"
+                    save_pickle(
+                        models[target_type][sound][input_name]["DecisionTreeClassifier_best"],
+                        model_trained_filepath + f" {fname}.pkl"
+                    )
+                    dot_data = tree.export_graphviz(models[target_type][sound][input_name]["DecisionTreeClassifier_best"], out_file=model_trained_filepath + f" {fname}.dot")
 
                     fig, ax = plt.subplots()
                     ax.set_xlabel("alpha")
@@ -995,6 +1033,11 @@ def speech_test():
 
 
 if __name__ == "__main__":
-    pass
+    import argparse
+    parser = argparse.ArgumentParser(description='Description of your program')
+    parser.add_argument('-s','--sample_length', help='Length of splits of wav data', default=sample_length, type=int)
+    args = parser.parse_args()
+    sample_length = args.sample_length
+
     # test_sample()
-    train()
+    train(sample_length)
